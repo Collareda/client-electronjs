@@ -13,7 +13,6 @@ src/**/*.js
 
 # dependencies
 /node_modules
-/release
 
 # IDEs and editors
 /.idea

@@ -1,6 +1,9 @@
-import { app, BrowserWindow, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, screen, Notification, dialog } from 'electron';
 import * as path from 'path';
 import * as url from 'url';
+const electron = require('electron');
+const ipc = electron.ipcMain;
+const { autoUpdater } = require('electron-updater');
 
 // Initialize remote module
 require('@electron/remote/main').initialize();
@@ -24,27 +27,63 @@ function createWindow(): BrowserWindow {
       nodeIntegration: true,
       allowRunningInsecureContent: (serve) ? true : false,
       contextIsolation: false,  // false if you want to run 2e2 test with Spectron
-      enableRemoteModule : true // true if you want to run 2e2 test  with Spectron or use remote module in renderer context (ie. Angular)
+      enableRemoteModule: true // true if you want to run 2e2 test  with Spectron or use remote module in renderer context (ie. Angular)
     },
   });
 
   if (serve) {
 
     win.webContents.openDevTools();
-
     require('electron-reload')(__dirname, {
       electron: require(`${__dirname}/node_modules/electron`)
     });
     win.loadURL('http://localhost:4200');
 
   } else {
+
     win.loadURL(url.format({
-      pathname: path.join(__dirname, 'dist/index.html'),
+      pathname: path.join(__dirname, '/dist/index.html'),
       protocol: 'file:',
       slashes: true
     }));
   }
 
+  let tray = null;
+  win.on('minimize', function (event) {
+    event.preventDefault();
+    win.hide();
+    tray = createTray();
+
+});
+
+  win.on('restore', function (event) {
+    win.show();
+    tray.destroy();
+});
+
+function createTray() {
+  let appIcon = new Tray(path.join(__dirname, "/img/tivit-log.jpg"));
+  const contextMenu = Menu.buildFromTemplate([
+      {
+          label: 'Abrir', click: function () {
+            win.show();
+          }
+      },
+      {
+          label: 'Fechar', click: function () {
+             /// app.isQuiting = true;
+              app.quit();
+          }
+      }
+  ]);
+
+  appIcon.on('double-click', function (event) {
+    win.show();
+  });
+  appIcon.setToolTip('EDI CLIENT');
+  appIcon.setContextMenu(contextMenu);
+  return appIcon;
+}
   // Emitted when the window is closed.
   win.on('closed', () => {
     // Dereference the window object, usually you would store window
@@ -80,7 +119,76 @@ try {
     }
   });
 
+  ipc.on('app_version', (event) => {
+    event.sender.send('app_version', { version: app.getVersion() });
+  });
+
+
+  win.once('ready-to-show', () => {
+    autoUpdater.checkForUpdatesAndNotify();
+  });
+
 } catch (e) {
   // Catch Error
   // throw e;
 }
+var Datastore = require('nedb');
+var db = new Datastore({ filename: 'data.db', autoload: true });
+
+ipc.on('insert-nedb', function (event, args) {
+    db.insert(args[0], function (err, newrec) {
+      console.log('----inserindo registro----')
+
+    });
+
+});
+
+ipc.on('findonebyentity-nedb', function (event, args) {
+  let entityNameValue = args[0];
+  db.findOne({ entityName:  entityNameValue}, function (err, docs) {
+    console.log('-buscando registros- entityname = '+entityNameValue)
+    console.log(docs);
+    event.returnValue= docs;
+  });
+});
+
+ipc.on('update-nedb', function (event, args) {
+  let entityNameValue = args[0];
+  db.update({entityName: entityNameValue},args[1],{}, function (err, numReplaced) {
+    console.log('-ATUALIZANDO REGISTRO-')
+  });
+});
+
+ipc.on('remove-nedb', function (event, args) {
+  let entityNameValue = args[0]
+  db.remove({entityName: entityNameValue},{}, function (err, numRemoved){
+
+  });
+});
+
+ipc.on('show-notification', function (event, args) {
+  // Para chamar o método show-notification:
+  // this._electronService.ipcRenderer.send('show-notification', ['Título da notificação', 'Corpo da notificação']);
+  let titulo = args[0];
+  let corpo = args[1];
+  new Notification({
+    title: titulo,
+    body: corpo,
+    icon: path.join(__dirname, "/img/tivit-log.jpg"),
+  }).show();
+});
+
+// Auto-updater from electron
+//
+//
+
+autoUpdater.on('update-available', () => {
+  win.webContents.send('update_available');
+});
+autoUpdater.on('update-downloaded', () => {
+  win.webContents.send('update_downloaded');
+});
+
+ipc.on('restart_app', () => {
+  autoUpdater.quitAndInstall();
+});

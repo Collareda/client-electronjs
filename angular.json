@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "cli": {
+    "analytics": false
+  },
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
@@ -20,9 +23,16 @@
               "src/assets"
             ],
             "styles": [
+              "node_modules/bootstrap/scss/bootstrap.scss",
               "src/styles.scss"
             ],
-            "scripts": [],
+            "allowedCommonJsDependencies": [
+              "lodash"
+            ],
+            "scripts": [
+              "node_modules/jquery/dist/jquery.js",
+              "node_modules/raphael/raphael.js"
+            ],
             "customWebpackConfig": {
               "path": "./angular.webpack.js"
             }
@@ -63,6 +73,7 @@
             "production": {
               "optimization": true,
               "outputHashing": "all",
+              "extractCss": true,
               "sourceMap": false,
               "namedChunks": false,
               "aot": true,
